@@ -63,8 +63,9 @@ def main() -> None:
     # node_id = args.node_id
 
     # Model and data
-    model = MCNN(lr=3e-4, batch_size=32, max_steps=400//32)
-    train_loader, val_loader, test_loader = load_data(batch_size=32)
+    lr = 3e-4
+    model = MCNN(lr=lr)
+    train_loader, val_loader, test_loader = load_data()
 
     # Flower client
     client = fl.client.to_client(FlowerClient(model, train_loader, val_loader, test_loader))

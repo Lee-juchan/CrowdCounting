@@ -14,6 +14,18 @@ class Conv2d(nn.Module):
         self.conv = nn.Conv2d(in_channels, out_channels, kernel_size, stride, padding=padding)
         self.bn = nn.BatchNorm2d(out_channels, eps=0.001, momentum=0, affine=True) if bn else None
         self.relu = nn.ReLU(inplace=True) if relu else None
+        # self.conv = []
+        # if dilation==1:
+        #     self.conv = nn.Conv2d(in_channels, out_channels, kernel_size, stride, padding=padding, dilation=dilation)
+        # else:
+        #     self.conv = nn.Conv2d(in_channels, out_channels, kernel_size, stride, padding=dilation, dilation=dilation)
+        # self.bn = nn.BatchNorm2d(out_channels, eps=0.001, momentum=0, affine=True) if bn else nn.Identity()
+        # if NL == 'relu' :
+        #     self.relu = nn.ReLU(inplace=True)
+        # elif NL == 'prelu':
+        #     self.relu = nn.PReLU()
+        # else:
+        #     self.relu = None
 
     def forward(self, x):
         x = self.conv(x)
@@ -26,7 +38,7 @@ class Conv2d(nn.Module):
 # Multi-column CNN 
 # Implementation of Single Image Crowd Counting via Multi-column CNN (Zhang et al.)
 class MCNN(LightningModule):
-    def __init__(self, lr, batch_size, max_steps, bn=False):
+    def __init__(self, lr, bn=False):
         super(MCNN, self).__init__()
         self.save_hyperparameters()
         self.use = 0
@@ -127,10 +139,3 @@ class MCNN(LightningModule):
         }
         
         return [optimizer], [scheduler]
-    
-    ## added
-    # def train_dataloader(self):
-    #     return train_loader
-
-    # def val_dataloader(self):
-    #     return val_loader

@@ -11,14 +11,13 @@ from pytorch_lightning.callbacks import ModelCheckpoint, LearningRateMonitor
 from datasets.dataset import load_data
 from model import MCNN
 
+seed_everything(42)
 
 # data loader 준비
 batch_size = 32
 train_loader, val_loader, test_loader = load_data(batch_size=batch_size)
 
 # trainer 생성
-seed_everything(42)
-
 epochs = 1
 max_steps = epochs * len(train_loader) # len(train_loader) == len(train) // batch_size
 
@@ -49,7 +48,7 @@ def weights_normal_init(model, dev=0.01):
 
 
 lr = 3e-4
-model = MCNN(lr, batch_size, max_steps)
+model = MCNN(lr)
 
 weights_normal_init(model, dev=0.01)
 model.use = 0
