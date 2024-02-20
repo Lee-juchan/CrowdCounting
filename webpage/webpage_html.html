@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html>
+<body>
+
+<input type='file' accept="image/*" onchange="uploadImage(this);" />
+<img id="input" src="#" alt="Input image" />
+<img id="output" src="#" alt="Output image" />
+
+<script>
+function uploadImage(input) {
+    if (input.files && input.files[0]) {
+        var reader = new FileReader();
+
+        reader.onload = function (e) {
+            document.getElementById('input').setAttribute('src', e.target.result);
+        }
+
+        reader.readAsDataURL(input.files[0]);
+
+        var formData = new FormData();
+        formData.append('file', input.files[0]);
+
+        fetch('/upload', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.blob())
+        .then(images => {
+            var outside = URL.createObjectURL(images);
+            document.getElementById('output').src = outside;
+        });
+    }
+}
+</script>
+
+</body>
+</html>
