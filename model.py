@@ -1,24 +1,19 @@
+'''
+    Building Model  : MCNN 모델 정의
+'''
+
 import torch
 import torch.nn as nn
-from pytorch_lightning import LightningModule, Trainer
+from pytorch_lightning import LightningModule
 
+# sub model
 class Conv2d(nn.Module):
-    def __init__(self, in_channels, out_channels, kernel_size, \
-                stride=1, NL='relu', same_padding=False, bn=False, dilation=1):
+    def __init__(self, in_channels, out_channels, kernel_size, stride=1, relu=True, same_padding=False, bn=False):
         super(Conv2d, self).__init__()
-        padding = int((kernel_size - 1) // 2) if same_padding else 0
-        self.conv = []
-        if dilation==1:
-            self.conv = nn.Conv2d(in_channels, out_channels, kernel_size, stride, padding=padding, dilation=dilation)
-        else:
-            self.conv = nn.Conv2d(in_channels, out_channels, kernel_size, stride, padding=dilation, dilation=dilation)
-        self.bn = nn.BatchNorm2d(out_channels, eps=0.001, momentum=0, affine=True) if bn else nn.Identity()
-        if NL == 'relu' :
-            self.relu = nn.ReLU(inplace=True)
-        elif NL == 'prelu':
-            self.relu = nn.PReLU()
-        else:
-            self.relu = None
+        padding = int((kernel_size - 1) / 2) if same_padding else 0
+        self.conv = nn.Conv2d(in_channels, out_channels, kernel_size, stride, padding=padding)
+        self.bn = nn.BatchNorm2d(out_channels, eps=0.001, momentum=0, affine=True) if bn else None
+        self.relu = nn.ReLU(inplace=True) if relu else None
 
     def forward(self, x):
         x = self.conv(x)
@@ -27,21 +22,16 @@ class Conv2d(nn.Module):
         if self.relu is not None:
             x = self.relu(x)
         return x
-    
 
+# Multi-column CNN 
+# Implementation of Single Image Crowd Counting via Multi-column CNN (Zhang et al.)
 class MCNN(LightningModule):
-    '''
-    Multi-column CNN 
-        -Implementation of Single Image Crowd Counting via Multi-column CNN (Zhang et al.)
-    '''
-    
     def __init__(self, lr, batch_size, max_steps, bn=False):
         super(MCNN, self).__init__()
-        
-        self.lr = lr
         self.save_hyperparameters()
-        
         self.use = 0
+        self.lr = lr
+        self.crit = nn.MSELoss()
         
         self.branch1 = nn.Sequential(Conv2d( 1, 16, 9, same_padding=True, bn=bn),
                                      nn.MaxPool2d(2),
@@ -70,14 +60,11 @@ class MCNN(LightningModule):
         self.out2 = nn.Sequential(Conv2d( 10, 1, 1, same_padding=True, bn=bn))
         self.out3 = nn.Sequential(Conv2d( 12, 1, 1, same_padding=True, bn=bn))
         
-        self.crit = nn.MSELoss()
-        
     def forward(self, im_data):
-        im_data = im_data.unsqueeze(1)
+        im_data = im_data.unsqueeze(1) # 1인 차원 생성, (batch, w, h) -> (batch, n, w, h)
         x1 = self.branch1(im_data)
         x2 = self.branch2(im_data)
         x3 = self.branch3(im_data)
-        
         
         if self.use == 0:
             x = torch.cat((x1,x2,x3),1)
@@ -141,8 +128,9 @@ class MCNN(LightningModule):
         
         return [optimizer], [scheduler]
     
-    def train_dataloader(self):
-        return train_loader
+    ## added
+    # def train_dataloader(self):
+    #     return train_loader
 
-    def val_dataloader(self):
-        return val_loader
+    # def val_dataloader(self):
+    #     return val_loader
