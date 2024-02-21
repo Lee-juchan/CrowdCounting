@@ -1,52 +1,55 @@
 '''
-    Prepare dataset : Dataset 정의
+    Dataset 정의
 '''
 
 import numpy as np
 import scipy
-from scipy.ndimage import gaussian_filter
 import cv2
 import torch
 from torch.utils.data import Dataset
 
 
 # dataset
-class MyDataset(Dataset):
+class ShanghaiTech(Dataset):
     def __init__(self, files, aug):
-        self.files = files
-        self.aug = aug
+        self.files = files      # file name list
+        self.aug = aug          # transform
         
     def __len__(self):
         return len(self.files)
     
     def __getitem__(self, idx):
-        fn = self.files[idx] # file path
+        fn = self.files[idx] # file name
+       
+        # file load (IMG, GT)
+        img = cv2.imread(fn, cv2.IMREAD_COLOR)
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+
+        mat = scipy.io.loadmat(fn.replace('images', 'ground-truth').replace('IMG', 'GT_IMG').replace('.jpg', '.mat'))
+        pos = mat['image_info'][0][0][0][0][0] # mat file -> (x,y) 좌표
         
-        im = cv2.imread(fn, cv2.IMREAD_COLOR) # img (gray)
-        im = cv2.cvtColor(im, cv2.COLOR_BGR2GRAY) 
+        # transform 적용
+        auged = self.aug(image=img, keypoints=pos)
+        img = auged['image']
+        pos = auged['keypoints']
         
-        m = scipy.io.loadmat(fn.replace('images', 'ground-truth').replace('IMG', 'GT_IMG').replace('.jpg', '.mat')) # ground truth
-        ps = m['image_info'][0][0][0][0][0]
-        
-        rst = self.aug(image=im, keypoints=ps)
-        im = rst['image']
-        ps = rst['keypoints']
-        
-        dm = np.zeros((im.shape[0], im.shape[1]), dtype=np.float32)
-        for x, y in ps:
+        # density map 생성 (좌표들 -> img)
+        dm = np.zeros((img.shape[0], img.shape[1]), dtype=np.float32)
+        for x, y in pos:
             x = int(x)
             y = int(y)
-            dm[y, x] = 1
+            dm[y, x] = 1    # dm[row, column]
 
+        # ground truth downsampling
         sigma = 4
-        dm = gaussian_filter(dm, sigma=sigma, truncate=4*sigma)
-        dm = cv2.resize(dm, (im.shape[1] // 4, im.shape[0] // 4), interpolation=cv2.INTER_LINEAR)
+        dm = cv2.GaussianBlur(dm, (0, 0), sigma)
+        dm = cv2.resize(dm, (img.shape[1] // 4, img.shape[0] // 4), interpolation=cv2.INTER_LINEAR) # interpolation= : 보간법
         dm *= 16
         
-        im = torch.from_numpy(im)
+        img = torch.from_numpy(img)
         dm = torch.from_numpy(dm)
         
-        return im, dm
+        return img, dm
 
 
 # dataset test
@@ -65,17 +68,18 @@ if __name__ == '__main__':
         A.RandomCrop(img_size, img_size),
         A.HorizontalFlip(p=0.5),
         A.RandomBrightnessContrast(),
-        A.Normalize((0.5), (0.5)),
+        A.Normalize(mean=(0.5), std=(0.5)),
     ], keypoint_params=A.KeypointParams(format='xy', angle_in_degrees=False))
 
     # dataset 생성
-    dataset = MyDataset(train, aug_train) # train sample
-    img, gt = dataset[0]
+    dataset = ShanghaiTech(train, aug_train) # train sample
+    img, dm = dataset[0]
+    # print(img.shape, dm.shape)
 
     fig, ax = plt.subplots(nrows=1, ncols=2)
     fig.set_size_inches(10, 5)
     ax[0].set_title('image')
     ax[0].imshow(img, cmap='gray')
     ax[1].set_title('ground truth')
-    ax[1].imshow(gt)
+    ax[1].imshow(dm)
     plt.show()

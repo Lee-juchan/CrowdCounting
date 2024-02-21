@@ -1,6 +1,7 @@
 '''
     Building Model  : MCNN 모델 정의
 '''
+'''metrix, config_optimizer 수정해보기'''
 
 import torch
 import torch.nn as nn
@@ -38,10 +39,10 @@ class Conv2d(nn.Module):
 # Multi-column CNN 
 # Implementation of Single Image Crowd Counting via Multi-column CNN (Zhang et al.)
 class MCNN(LightningModule):
-    def __init__(self, lr, bn=False):
+    def __init__(self, lr, max_steps, bn=False):
         super(MCNN, self).__init__()
-        self.save_hyperparameters()
-        self.use = 0
+        self.save_hyperparameters() # self.hparam을 사용하게 해줌; model에 입력받은 args
+        self.use = 0    # default : MCNN 전체
         self.lr = lr
         self.crit = nn.MSELoss()
         
@@ -66,34 +67,39 @@ class MCNN(LightningModule):
                                      Conv2d(48, 24, 3, same_padding=True, bn=bn),
                                      Conv2d(24, 12, 3, same_padding=True, bn=bn))
         
-        self.fuse = nn.Sequential(Conv2d( 30, 1, 1, same_padding=True, bn=bn))
+        self.fuse = nn.Sequential(Conv2d( 30, 1, 1, same_padding=True, bn=bn))  # MCNN output
         
-        self.out1 = nn.Sequential(Conv2d( 8, 1, 1, same_padding=True, bn=bn))
+        self.out1 = nn.Sequential(Conv2d( 8, 1, 1, same_padding=True, bn=bn))   # 각 column(CNN) ouput
         self.out2 = nn.Sequential(Conv2d( 10, 1, 1, same_padding=True, bn=bn))
         self.out3 = nn.Sequential(Conv2d( 12, 1, 1, same_padding=True, bn=bn))
         
     def forward(self, im_data):
-        im_data = im_data.unsqueeze(1) # 1인 차원 생성, (batch, w, h) -> (batch, n, w, h)
-        x1 = self.branch1(im_data)
-        x2 = self.branch2(im_data)
-        x3 = self.branch3(im_data)
+        im_data = im_data.unsqueeze(1) # 차원 생성, (batch, h, w) -> (batch, n, h, w)
         
-        if self.use == 0:
-            x = torch.cat((x1,x2,x3),1)
-            x = self.fuse(x)
-        elif self.use == 1:
+        '''self.use에 따라 필요없는 x1, x2, x3이 존재하는데..????????????????////'''
+        x1 = self.branch1(im_data)  # shape [1, 8, 192, 256]
+        x2 = self.branch2(im_data)  # shape [1, 10, 192, 256]
+        x3 = self.branch3(im_data)  # shape [1, 12, 192, 256]
+        # print(f'x1:{x1.shape}, x2:{x2.shape}, x3:{x3.shape}')
+        
+        if self.use == 0: # MCNN
+            x = torch.cat((x1,x2,x3),1) # shape [1, 30, 192, 256]
+            x = self.fuse(x)            # shape [1, 1, 192, 256]
+            # print(f'x:{x.shape}')
+
+        elif self.use == 1: # branch 1
             x = self.out1(x1)
-        elif self.use == 2:
+        elif self.use == 2: # branch 2
             x = self.out2(x2)
-        elif self.use == 3:
+        elif self.use == 3: # branch 3
             x = self.out3(x3)
         
-        return x.squeeze(1)
+        return x.squeeze(1) # 차원 제거 [1, 192, 256]
     
-    
-    def training_step(self, batch, batch_idx):
+    '''train 시간이 너무 오래 걸리면 필요없는 metrix 빼도 될 듯'''
+    def training_step(self, batch, batch_idx): # 단일배치 훈련
         self.train()
-        x, y = batch
+        x, y = batch    # img, dm
         
         pred = self(x)
         loss = self.crit(pred, y)
@@ -104,7 +110,7 @@ class MCNN(LightningModule):
         
         mae = torch.abs(pred_sum - gt_sum).float().mean()
         
-        self.log('train_loss', loss)
+        self.log('train_loss', loss) # mse
         self.log('train_acc', acc)
         self.log('train_mae', mae)
         
@@ -128,13 +134,13 @@ class MCNN(LightningModule):
             self.log('val_acc', acc)
             self.log('val_mae', mae)
             
-            
+    '''더 공부해보기/!!!!!!!'''
     def configure_optimizers(self):
         optimizer = torch.optim.AdamW(self.parameters(), lr=self.lr, weight_decay=1e-4)
         
         scheduler = {
-            'scheduler': torch.optim.lr_scheduler.OneCycleLR(optimizer, max_lr=self.lr, total_steps=self.hparams.max_steps, pct_start=0.1, cycle_momentum=False),
-            'interval': 'step',
+            'scheduler': torch.optim.lr_scheduler.OneCycleLR(optimizer, max_lr=self.lr, total_steps=self.hparams.max_steps, pct_start=0.1, cycle_momentum=False), # , total_steps=self.hparams.max_steps
+            'interval': 'step', # step
             'frequency': 1
         }
         

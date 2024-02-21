@@ -25,10 +25,10 @@ im = cv2.cvtColor(im, cv2.COLOR_BGR2GRAY)
 
 # output image
 im = im.astype(np.float32) / 255.0              # [0,1]로 정규화
-im_tensor = torch.from_numpy(im).unsqueeze(0)   # batch_size 차원 추가 : (w, h) -> (1, w, h)
+im_tensor = torch.from_numpy(im).unsqueeze(0)   # batch_size 차원 추가 : (h, w) -> (1, h, w)
 
 out = model(im_tensor)
-out_im = out.detach().squeeze(0)                # batch_size 차원 제거 : (1, w, h) -> (w, h)
+out_im = out.detach().squeeze(0)                # batch_size 차원 제거 : (1, h, w) -> (h, w)
 
 # plot
 fig, ax = plt.subplots(nrows=1, ncols=2)
@@ -41,4 +41,4 @@ ax[1].imshow(out_im)
 plt.show()
 
 # save output image
-plt.savefig('model_output.png')
+plt.savefig('./images/model_output.png')
