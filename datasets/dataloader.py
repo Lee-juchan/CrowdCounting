@@ -13,8 +13,8 @@ from datasets.dataset import ShanghaiTech
 
 
 # data set 분리 (img path만 저장된)
-train = [p.path for p in os.scandir(path.join(path.dirname(__file__), '../ShanghaiTech/part_B/train_data/images/'))]    # list comprehension 사용한 버전
-test_full = [p.path for p in os.scandir(path.join(path.dirname(__file__), '../ShanghaiTech/part_B/test_data/images/'))]
+train = [p.path for p in os.scandir(path.join(path.dirname(__file__), 'ShanghaiTech/part_B/train_data/images'))]    # list comprehension 사용한 버전
+test_full = [p.path for p in os.scandir(path.join(path.dirname(__file__), 'ShanghaiTech/part_B/test_data/images'))]
 test, valid = train_test_split(test_full, test_size=64, random_state=42) # test_full -> test + valid
 
 # argument
@@ -34,8 +34,8 @@ aug_val = A.Compose([
 
 # dataloader 생성
 def load_train(batch_size):
-    train_loader = DataLoader(ShanghaiTech(train, aug_train), batch_size=batch_size, shuffle=True, drop_last=True, pin_memory=True, num_workers=2) # pin_memory= : CUDA 고정 메모리에 올릴지여부
-    return train_loader                                                                                                                         # num_workers= : 데이터 로딩에 사용하는 subprocess 수 (멀티 프로세싱), 원본은 4
+    train_loader = DataLoader(ShanghaiTech(train, aug_train), batch_size=batch_size, shuffle=True, drop_last=True, pin_memory=True, num_workers=2)  # pin_memory= : CUDA 고정 메모리에 올릴지여부
+    return train_loader                                                                                                                             # num_workers= : 데이터 로딩에 사용하는 subprocess 수 (멀티 프로세싱), 원본은 4
 
 def load_val(batch_size):
     val_loader = DataLoader(ShanghaiTech(valid, aug_val), batch_size=batch_size, shuffle=True, drop_last=True, pin_memory=True, num_workers=2)
