@@ -5,7 +5,7 @@ import torch
 import pytorch_lightning as pl
 
 from model import MCNN
-from datasets.dataset import load_data
+from datasets.dataset import ShanghaiTech
 # from datasets.utils.logging import disable_progress_bar       내가 만든 datasets dir 아님
 # disable_progress_bar()
 
