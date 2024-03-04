@@ -1,11 +1,20 @@
 import argparse
 from collections import OrderedDict
 import flwr as fl
-import torch
 import pytorch_lightning as pl
+import albumentations as A
+import torch
+import os
+import cv2
+import numpy as np
+from torch.utils.data import DataLoader, Dataset
 
-from model import MCNN
-from datasets.dataset import ShanghaiTech
+from flwr import client
+from matplotlib import pyplot as plt
+from model import Conv2d, MCNN
+from datasets.dataset import MyDataset, aug_train, aug_val
+from sklearn.model_selection import train_test_split
+
 # from datasets.utils.logging import disable_progress_bar       내가 만든 datasets dir 아님
 # disable_progress_bar()
 
@@ -41,8 +50,11 @@ class FlowerClient(fl.client.NumPyClient):
         return loss, 252, {"loss": loss}
 
 
-def _get_parameters(model):
-    return [val.cpu().numpy() for _, val in model.state_dict().items()]
+# def _get_parameters(model):
+#     return [val.cpu().numpy() for _, val in model.state_dict().items()]
+def _get_parameters(model):    
+    parameters = [v.detach().cpu().numpy() for v in model.parameters()]
+    return parameters
 
 
 def _set_parameters(model, parameters):
@@ -63,12 +75,37 @@ def main() -> None:
     # node_id = args.node_id
 
     # Model and data
+    train = [p.path for p in os.scandir('ShanghaiTech/part_B/train_data/images/')]
+    valid_full = [p.path for p in os.scandir('ShanghaiTech/part_B/test_data/images/')]
+    
+    batch_size = 32
+    epochs = 300
+    max_steps = epochs * len(train) // batch_size
+    
+    _, valid = train_test_split(valid_full, test_size=64, random_state=42)
+    
+    train_loader = DataLoader(MyDataset(train, aug_train), batch_size=batch_size, shuffle=True, drop_last=True, pin_memory=True, num_workers=0)
+    val_loader = DataLoader(MyDataset(valid, aug_val), batch_size=batch_size, shuffle=False, drop_last=False, pin_memory=True, num_workers=0)
+
+    ## use a small subset for validation
+    len(train), len(valid)
+
+
+
+
+
     lr = 3e-4
-    model = MCNN(lr=lr)
-    train_loader, val_loader, test_loader = load_data()
+    model = MCNN(lr, batch_size, max_steps)
+    
+    test_dataset = MyDataset(valid, aug_val)
+    test_loader = DataLoader(test_dataset, batch_size=64)
+    
+
+    # 저장된 모델의 가중치를 불러옵니다.
+    # model.load_state_dict(torch.load('mcnn_model_1.pth'))
 
     # Flower client
-    client = fl.client.to_client(FlowerClient(model, train_loader, val_loader, test_loader))
+    client = FlowerClient(model, train_loader, val_loader, test_loader)
     fl.client.start_client(server_address="127.0.0.1:8080", client=client)
 
 
